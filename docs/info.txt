@@ -1,0 +1,8 @@
+ppo
+https://github.com/ericyangyu/PPO-for-Beginners/blob/master/ppo.py
+https://huggingface.co/sb3/ppo-MiniGrid-MultiRoom-N4-S5-v0/tree/main
+
+rl starters implementation
+https://github.com/lcswillems/rl-starter-files/tree/master
+
+a2c
