@@ -6,3 +6,6 @@ rl starters implementation
 https://github.com/lcswillems/rl-starter-files/tree/master
 
 a2c
+https://medium.com/@dixitaniket76/advantage-actor-critic-a2c-algorithm-explained-and-implemented-in-pytorch-dc3354b60b50
+
+https://minigrid.farama.org/environments/minigrid/MultiRoomEnv/
