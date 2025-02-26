@@ -21,12 +21,12 @@ class ActCrit(nn.Module):
             nn.ReLU(),
             nn.Conv2d(32, self.final_conv_depth, (2, 2)),
             nn.ReLU(),
-            nn.Flatten()
+            nn.Flatten(start_dim=1) #TODO temp
         )
         
         # actor network
         self.actor = nn.Sequential(
-            nn.Linear(self.final_conv_size ** 2 * self.final_conv_depth, 64),
+            nn.Linear((self.final_conv_size ** 2) * self.final_conv_depth, 64),
             nn.ReLU(),
             nn.Linear(64, self.action_space),
             nn.Softmax(dim=-1)
@@ -34,14 +34,13 @@ class ActCrit(nn.Module):
 
         # critic_network
         self.critic = nn.Sequential(
-            nn.Linear(self.final_conv_size ** 2 * self.final_conv_depth, 64),
+            nn.Linear((self.final_conv_size ** 2) * self.final_conv_depth, 64),
             nn.ReLU(),
             nn.Linear(64, 1)
         )
     
     def forward(self, x):
-        x = self.backbone(x)
-        features = x.reshape(x.shape[0], -1)
+        features = self.backbone(x)
         # get action distribution
         act_proba = self.actor(features)
         act_dist = Categorical(probs = act_proba)
