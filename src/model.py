@@ -1,4 +1,5 @@
 import torch.nn as nn
+from torch.distributions import Categorical
 
 class ActCrit(nn.Module):
     ''' an actor-critic model with two heads.'''
@@ -41,8 +42,10 @@ class ActCrit(nn.Module):
     def forward(self, x):
         x = self.backbone(x)
         features = x.reshape(x.shape[0], -1)
-        # get actor-critic heads
-        act_dist = self.actor(features)
+        # get action distribution
+        act_proba = self.actor(features)
+        act_dist = Categorical(probs = act_proba)
+        # get value
         value = self.critic(features).squeeze(1)
         
         return act_dist, value

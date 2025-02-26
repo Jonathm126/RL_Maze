@@ -2,8 +2,6 @@ import IPython
 import base64
 import subprocess
 import webbrowser
-import time
-import os
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -19,10 +17,7 @@ def embed_mp4(filename):
 
   return IPython.display.HTML(tag)
 
-def launch_tb(log_dir, experiment_name):
-  # create log dir
-  timestamp = time.strftime("%b-%d_%H-%M-%S")
-  log_dir = os.path.join(log_dir, experiment_name, f'{timestamp}')
+def launch_tb(log_dir):
   tb_writer = SummaryWriter(log_dir)
   print(f"TensorBoard logs are saved in: {log_dir}")
   
