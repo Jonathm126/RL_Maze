@@ -7,21 +7,23 @@ class ActCrit(nn.Module):
         super().__init__()
         
         # store params
-        self.h, self.w, self.c = obs_space.shape[0:3]
         self.action_space = action_space
-        self.final_conv_size = 25
+        self.final_conv_size = 9
         self.final_conv_depth = 64
         
         # build image processing backbone
         self.backbone = nn.Sequential(
-            nn.Conv2d(3, 16, (2, 2)),
+            nn.Conv2d(3, 16, kernel_size=2, stride=1), # output 55 X 55
             nn.ReLU(),
-            nn.MaxPool2d((2, 2)),
-            nn.Conv2d(16, 32, (2, 2)),
+            nn.MaxPool2d(kernel_size=2, stride=2), # output 27 X 27
+            
+            nn.Conv2d(16, 32, kernel_size=4, stride=2), # 12 X 12
             nn.ReLU(),
-            nn.Conv2d(32, self.final_conv_depth, (2, 2)),
+            
+            nn.Conv2d(32, self.final_conv_depth, kernel_size=4, stride=1), # 9 X 9
             nn.ReLU(),
-            nn.Flatten(start_dim=1) #TODO temp
+            
+            nn.Flatten(start_dim=1)
         )
         
         # actor network
@@ -48,6 +50,3 @@ class ActCrit(nn.Module):
         value = self.critic(features).squeeze(1)
         
         return act_dist, value
-
-class ACAgent():
-    pass

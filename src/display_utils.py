@@ -27,3 +27,4 @@ def launch_tb(log_dir):
                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
   webbrowser.open(f"http://localhost:{port}");
   return tb_process, tb_writer
+

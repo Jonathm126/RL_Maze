@@ -4,45 +4,65 @@ import torch.nn.functional as F
 from dataclasses import dataclass
 
 # my imports
-from src.format_utils import preproess_obs, map_action
+from src.format_utils import preprocess_obs, map_action
+from src.eval_utils import evaluate_agent_rewards
 
 @dataclass
 class Trainer():
-    def __init__(self, device, model, writer, model_path = None):
+    def __init__(self, device, model, optimizer, writer, model_path = None):
         self.device = device
         self.episode = 0
         self.model = model
+        self.optimizer = optimizer
         self.writer = writer
         self.path = model_path
     
-    def reset(self, model):
-        self.model = model
+    def reset_episodes(self):
         self.episode = 0
-        self.step = 0
     
-    def A2CTrain(self, env, optimizer, l_params, max_episodes, max_attempts = None):
-        # unpack
+    def A2Closs(self, l_params, rollout, next_value):
+        '''compute a2c losses for tensors of values'''
+        # rollout size
+        n_rollout = rollout['rewards'].shape[0]
+        gamma = l_params['gamma']
+        
+        # compute returns
+        returns = torch.cat([torch.zeros(n_rollout, device=self.device), 
+                            next_value], dim=-1)
+        for t in reversed(range(n_rollout)):
+            returns[t] = rollout['rewards'][t] + gamma * returns[t + 1] * (1 - rollout['dones'][t]) 
+        returns = returns[:-1]
+        
+        # compute the advantage function
+        advantage = returns - rollout['values']
+        # value loss (critic)
+        critic_loss = F.mse_loss(rollout['values'], returns.detach(), reduction='mean')
+        # actor loss 
+        actor_loss = -(rollout['log_probs'] * advantage.detach()).mean()
+        # entropy loss
+        entropy_loss = rollout['entropies'].mean()
+        
+        return actor_loss, critic_loss, entropy_loss
+    
+    def A2CTrain(self, env, l_params, max_episodes, eval_every_episodes, rollout_size, experiment_phase = None, save_every = 1000):
+        '''preformes rollout with rollout_size'''
+        
+        # compute episode
         start_episode = self.episode
         end_episode = max_episodes + start_episode
-        attempts = 0
         
-        # set model
-        self.optimizer = optimizer(self.model.parameters(), lr=l_params['lr'])
+        # set optimizer and model
         self.model.train()
         
         # iterate on eposides
         for self.episode in range (start_episode, end_episode):
-            # reset environment if first episode or if max attempts exceeded or done
-            # TODO deal with truncation mechanism
-            # if done or attempts >= max_attempts:
-            #     attempts = 0 
-            # else:
-            #     # Continue from the current state without resetting the environment
-            #     obs = torch_obs 
-                
+            # rollout buffer - dict of tensosrs
+            rollout_buffer = {key: torch.zeros((rollout_size,), dtype=torch.float32, device=self.device) 
+                                for key in ["log_probs", "values", "rewards", "dones", "entropies"]}            
+            
             # get initial observation
             obs, _ = env.reset()
-            torch_obs = preproess_obs(obs, self.device)
+            torch_obs = preprocess_obs(obs, self.device)
             
             # reset params
             done, truncated = False, False
@@ -50,45 +70,79 @@ class Trainer():
             
             # preform steps
             while not done and not truncated:
-                # get model outputs
-                act_dist, value = self.model(torch_obs)
-                action = act_dist.sample()
-                log_prob_action = act_dist.log_prob(action)
+                ep_step = 0
+                # preform rollout
+                for rollout_step in range(rollout_size):
+                    # check if done
+                    if done or truncated: 
+                        break
+                    
+                    # get model outputs
+                    act_dist, value = self.model(torch_obs)
+                    
+                    # compute action and params
+                    action = act_dist.sample()
+                    log_prob_action = act_dist.log_prob(action)
+                    action_entropy = act_dist.entropy()
+                    
+                    # map action 3 to 5 (unused actions)
+                    action_mapped = map_action(action).item()
+                    self.writer.add_scalar(f'{experiment_phase}/Action Taken', action_mapped, self.episode)
+                    
+                    # preform step
+                    next_obs, reward, done, truncated, _ = env.step(action_mapped)
+                    torch_next_obs = preprocess_obs(next_obs, self.device)
+                    reward = reward * l_params['reward_amplify'] - ep_step * l_params['reward_penalty']
+                    
+                    # append to rollout buffer
+                    rollout_buffer["log_probs"][rollout_step] = log_prob_action
+                    rollout_buffer["values"][rollout_step] = value
+                    rollout_buffer["rewards"][rollout_step] = reward
+                    rollout_buffer["dones"][rollout_step] = done
+                    rollout_buffer["entropies"][rollout_step] = action_entropy
+                    
+                    torch_obs = torch_next_obs
+                    episode_return += reward
+                    ep_step += 1
                 
-                # map action 3 to 5 (unused actions)
-                action_mapped = map_action(action)
-                
-                # preform the action
-                next_obs, reward, done, truncated ,_ = env.step(action_mapped)
-                torch_next_obs = preproess_obs(next_obs, self.device)
-                
+                # after the rollout, preform optimization
                 # use the critic to estimate the value of the next step
                 with torch.no_grad():
                     _, next_value = self.model(torch_next_obs)
                 
-                # critic loss loss
-                td_target = reward + l_params['gamma'] * next_value * (1 - done)
-                advantage = td_target - value
-                critic_loss = F.mse_loss(value, td_target.detach())
-                
-                # actor loss
-                actor_loss = -log_prob_action * advantage.detach()
-                
-                # total loss
-                loss = l_params['critic_lr_weight'] * critic_loss + \
-                        l_params['actor_lr_weight'] * actor_loss
+                # compute loss
+                actor_loss, critic_loss, entropy_loss = self.A2Closs(l_params, rollout_buffer, next_value)
+                loss = (l_params['critic_weight'] * critic_loss +
+                        l_params['actor_weight'] * actor_loss +
+                        l_params['entropy_weight'] * entropy_loss)
                 
                 # preform optimization step
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 loss.backward()
-                optimizer.step()
+                self.optimizer.step()
                 
-                # update params
-                torch_obs = torch_next_obs
-                episode_return += reward
-                attempts += 1
+                # reset rollout
+                rollout_buffer = {key: torch.zeros_like(tensor) for key, tensor in rollout_buffer.items()}
             
-            # Record statistics
-            self.writer.add_scalar('Loss/Actor', actor_loss.item(), self.episode)
-            self.writer.add_scalar('Loss/Critic', critic_loss.item(), self.episode)
-            self.writer.add_scalar('Returns/Episode Return', episode_return, self.episode)
+            print(self.episode)
+            
+            # log epoch stats
+            self.writer.add_scalars(f'{experiment_phase}/Training Losses', {'Actor': actor_loss.item(),'Critic': critic_loss.item(),
+                                    'Total': loss.item()}, self.episode)
+            self.writer.add_scalar(f'{experiment_phase}/Training Episode Return', episode_return, self.episode)
+            # self.writer.add_scalar('Returns/Rolling Average Return', rolling_avg_return, self.episode)
+            
+            # preform evaluateion every 'eval_every_episodes'
+            if self.episode % eval_every_episodes == 0:
+                self.model.eval()
+                _, avg_reward, success_rate = evaluate_agent_rewards(self.device, self.model, env, num_episodes=50)
+                self.model.train()
+                
+                # log evaluation results
+                self.writer.add_scalar(f'{experiment_phase}/Eval/Average Reward', avg_reward, self.episode)
+                self.writer.add_scalar(f'{experiment_phase}/Eval/Success Rate', success_rate, self.episode)
+            
+            # save every 1000 episodes
+            if (self.episode + 1) % save_every == 0 and save_every is not None:
+                checkpoint_filename = self.path + '\\' + f"{experiment_phase}_epi_{self.episode}.pth"
+                torch.save(self.model.state_dict(), checkpoint_filename)
