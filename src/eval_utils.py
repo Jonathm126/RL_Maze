@@ -40,7 +40,7 @@ def evaluate_agent_rewards(device, model, env, num_episodes=10, max_steps = None
 
     avg_reward = np.mean(total_rewards)
     success_rate = success_count / num_episodes
-    steps_to_done = steps_to_done / success_count # normalize by number of sucesses
+    steps_to_done = steps_to_done / success_count if success_count != 0 else 0
 
     return total_rewards, avg_reward, success_rate, steps_to_done
 

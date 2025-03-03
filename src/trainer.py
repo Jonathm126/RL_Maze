@@ -45,7 +45,7 @@ class Trainer():
         # value loss (critic)
         critic_loss = F.mse_loss(rollout['values'][0:n_rollout], returns.detach(), reduction='mean')
         # actor loss 
-        actor_loss = -(rollout['log_probs'][0:n_rollout] * advantage.detach()).mean()
+        actor_loss = -(rollout['log_probs'][0:n_rollout] * advantage.detach()).mean()# advantage .detach()
         # entropy loss
         entropy_loss = rollout['entropies'][0:n_rollout].mean()
         
@@ -68,7 +68,7 @@ class Trainer():
             
             # reset params
             done = False
-            episode_return, ep_step = 0, 0
+            episode_return, episode_critic_loss, episode_actor_loss, ep_step = 0, 0, 0, 0
             
             # steps inside episode loop
             while not done and ep_step <= episode_max_steps:
@@ -76,7 +76,7 @@ class Trainer():
                 buffer_full = self.buffer.reset()
                 
                 # rollout loop
-                while not buffer_full and not done and ep_step <= episode_max_steps :
+                while not buffer_full and not done and ep_step <= episode_max_steps:
                     # get model outputs
                     act_dist, value = self.model(torch_obs)
                     
@@ -109,6 +109,8 @@ class Trainer():
                 # compute loss
                 actor_loss, critic_loss, entropy_loss = self.A2Closs(l_params, self.buffer, next_value)
                 loss = (l_params['critic_weight'] * critic_loss + l_params['actor_weight'] * actor_loss + l_params['entropy_weight'] * entropy_loss)
+                episode_actor_loss += actor_loss.item()
+                episode_critic_loss += critic_loss.item()
                 
                 # preform optimization step
                 self.optimizer.zero_grad()
@@ -116,8 +118,8 @@ class Trainer():
                 self.optimizer.step()
             
             # log epoch stats
-            self.writer.add_scalars(f'{self.experiment_phase}/Training Losses', {'Actor': actor_loss.item(),'Critic': critic_loss.item(),
-                                    'Total': loss.item()}, self.episode)
+            self.writer.add_scalars(f'{self.experiment_phase}/Training Losses', {'Actor': episode_actor_loss,'Critic': episode_critic_loss, 
+                                    'Total': episode_critic_loss + episode_actor_loss}, self.episode)
             self.writer.add_scalar(f'{self.experiment_phase}/Training Episode Return', episode_return, self.episode)
             # self.writer.add_scalar('Returns/Rolling Average Return', rolling_avg_return, self.episode)
             # if sucessful, log steps to completion
