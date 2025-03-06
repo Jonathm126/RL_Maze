@@ -1,5 +1,6 @@
 import numpy as np
 import imageio
+import torch
 from src.format_utils import preprocess_obs, map_action
 
 def evaluate_agent_rewards(device, model, env, num_episodes=10, max_steps = None):
@@ -16,8 +17,9 @@ def evaluate_agent_rewards(device, model, env, num_episodes=10, max_steps = None
         while not (done or truncated):
             # select action
             act_dist, _ = model(torch_obs)
-            action = act_dist.sample()
-            action_mapped = map_action(action).item()
+            # use argmax to find the best action
+            action = act_dist.probs.argmax().item()
+            action_mapped = map_action(action)
             # preform step
             obs, reward, done, truncated, _ = env.step(action_mapped)
             torch_obs = preprocess_obs(obs, device)
@@ -53,9 +55,10 @@ def record_agent_video(device, model, env, video_path, fps=10):
     with imageio.get_writer(video_path, fps=fps) as video:
         while not done:
             video.append_data(env.render())  # Store frame for video
-            action_dist, _ = model(torch_obs)  # Agent takes action
-            action = action_dist.sample()
-            action = map_action(action).item()
+            # action_dist, _ = model(torch_obs)  # Agent takes action
+            # action = action_dist.sample()
+            # action = map_action(action).item()
+            action,_,_ = model.get_action(obs)
             obs, _, done, truncated, _ = env.step(action)
             torch_obs = preprocess_obs(obs, device)
             done = done or truncated

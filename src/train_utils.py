@@ -35,3 +35,22 @@ class RolloutBuffer():
             raise KeyError(f"Parameter '{key}' not found in the buffer.")
         # Return only the valid (filled) portion of the tensor.
         return self.buffer[key][:self.position]
+
+def compute_returns(gamma, rewards):
+    """
+    Compute discounted returns from rewards.
+    """
+    returns = []
+    G = 0
+    for reward in reversed(rewards):
+        G = reward + gamma * G
+        returns.append(G)
+    returns = torch.tensor(returns[::-1], dtype=torch.float32)
+    
+    # Normalize returns
+    #Returns can have widely varying scales depending on the rewards and discount factor (γ) used.
+    #Large return values can cause large gradient updates, leading to instability during training.
+    #Normalization ensures that the scale of the updates is more consistent. TODO return this
+    # returns = (returns - returns.mean()) / (returns.std() + 1e-8)
+    
+    return returns.view(-1)

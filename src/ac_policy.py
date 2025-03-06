@@ -48,5 +48,4 @@ class ActCrit(nn.Module):
         act_dist = Categorical(probs = act_proba)
         # get value
         value = self.critic(features).squeeze(1)
-        
         return act_dist, value
