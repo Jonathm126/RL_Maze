@@ -1,6 +1,6 @@
 import sys
 import torch  
-import torch.optim as optim
+from torch.optim import Adam
 from tqdm import tqdm
 
 # import gymnasium as gym
@@ -22,7 +22,7 @@ class ReinforceTrainer():
         self.path = None
         
         # built in optimizer
-        self.optimizer = optim.Adam(self.policy_network.parameters(), lr=lr)
+        self.optimizer = Adam(params = self.policy_network.parameters(), lr=lr)
     
     def update_phase(self, phase):
         self.phase = phase
@@ -30,6 +30,9 @@ class ReinforceTrainer():
     def set_lr(self, new_lr):
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = new_lr
+        
+    def zero_episodes(self):
+        self.episode = 0
     
     # update policy
     def update_policy(self, rewards, log_probs, entropies):
@@ -55,7 +58,7 @@ class ReinforceTrainer():
         policy_gradient = torch.stack(policy_gradient).sum()
         
         # compute 
-        entropy_loss = self.entropy_weight * entropies.sum()
+        entropy_loss = self.entropy_weight * entropies.mean()
         loss = policy_gradient - entropy_loss
         
         # policy update step

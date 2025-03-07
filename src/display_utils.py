@@ -17,13 +17,13 @@ def embed_mp4(filename):
 
   return IPython.display.HTML(tag)
 
-def launch_tb(log_dir):
+def launch_tb(log_dir, port = 6008):
   tb_writer = SummaryWriter(log_dir)
   print(f"TensorBoard logs are saved in: {log_dir}")
   
   # launch tb
-  port = 6000
-  tb_process = subprocess.Popen(["tensorboard", f"--logdir={log_dir}", f"--port={port}", "--host=localhost", "--reload_multifile=True"], 
+  port = 6010
+  tb_process = subprocess.Popen(["tensorboard", f"--logdir={log_dir}", f"--port={port}", "--host=localhost"], 
                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   webbrowser.open(f"http://localhost:{port}");
   return tb_process, tb_writer

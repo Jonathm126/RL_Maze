@@ -3,8 +3,7 @@ import torch.distributions
 import torch.nn.functional as F
 
 # my imports
-from src.format_utils import preprocess_obs, map_action
-from src.eval_utils import evaluate_agent_rewards
+from src.utils import evaluate_agent_rewards, preprocess_obs, map_action
 from src.train_utils import RolloutBuffer, compute_returns
 
 class Trainer():

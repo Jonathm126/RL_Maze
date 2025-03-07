@@ -1,7 +1,10 @@
 import numpy as np
 import imageio
 import torch
-from src.format_utils import preprocess_obs, map_action
+import gymnasium
+import minigrid
+from minigrid.wrappers import RGBImgObsWrapper, RGBImgPartialObsWrapper, ImgObsWrapper, FullyObsWrapper, RGBImgPartialObsWrapper, ReseedWrapper, ActionBonus
+
 
 def evaluate_agent_rewards(device, model, env, num_episodes=10, max_steps = None):
     '''evaluate a policy over multiple episodes.'''
@@ -64,3 +67,41 @@ def record_agent_video(device, model, env, video_path, fps=10):
             done = done or truncated
 
     return video_path
+
+def build_envs():
+    # env options
+    env_names = ["MiniGrid-MultiRoom-N2-S4-v0", "MiniGrid-MultiRoom-N4-S5-v0","MiniGrid-MultiRoom-N6-v0"] 
+
+    # env config
+    highlight = False
+    render_mode = "rgb_array"
+
+    # build env_0 with two rooms
+    env_2_rooms = gymnasium.make(env_names[0], render_mode=render_mode, highlight=highlight)
+    env_2_rooms = ImgObsWrapper(RGBImgPartialObsWrapper(env_2_rooms)) 
+    
+    # build env_01 with 4 rooms
+    env_4_rooms = gymnasium.make(env_names[1], render_mode=render_mode, highlight=highlight)
+    env_4_rooms = ImgObsWrapper(RGBImgPartialObsWrapper(env_4_rooms)) 
+    
+    # next env
+    env_6_rooms = gymnasium.make(env_names[2], render_mode=render_mode, highlight=highlight)
+    env_6_rooms = ImgObsWrapper(RGBImgPartialObsWrapper(env_6_rooms)) 
+    
+    return env_2_rooms, env_4_rooms, env_6_rooms
+
+def preprocess_obs(obs, device):
+    ''' preprocess an observation to torch image and cast to float. '''
+    np_obs = torch.from_numpy(obs).type(torch.float32)
+    np_obs = np_obs / 255.0 # scale to 0-1
+    np_obs = np_obs.permute(2, 0, 1).unsqueeze(0).to(device)
+    return np_obs
+
+def map_action(action):
+    ''' maps a 0-3 action space to 0-6, with 3, 4, 6 unused.'''
+    # if tensor
+    if isinstance(action, torch.Tensor):
+        return torch.where(action == 3, torch.tensor(5), action)
+    else:
+        # if not a tensor
+        return 5 if action == 3 else action

@@ -5,11 +5,11 @@ from torch.autograd import Variable
 import numpy as np
 
 # my imports
-from src.format_utils import preprocess_obs
+from src.utils import preprocess_obs
 
 class CNNPolicyNetwork(nn.Module):
     def __init__(self, device, num_actions):
-        super(CNNPolicyNetwork, self).__init__()
+        super().__init__()
         
         # store params
         self.device = device
