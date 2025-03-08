@@ -8,7 +8,7 @@ import numpy as np
 from src.utils import preprocess_obs
 
 class CNNPolicyNetwork(nn.Module):
-    def __init__(self, device, num_actions):
+    def __init__(self, device, num_actions, critic = False):
         super().__init__()
         
         # store params
@@ -16,6 +16,7 @@ class CNNPolicyNetwork(nn.Module):
         self.final_conv_depth = 64
         self.hidden_size = 128
         self.num_actions = num_actions
+        self.critic = critic
         
         # feature extractor
         self.backbone = nn.Sequential(
@@ -32,25 +33,48 @@ class CNNPolicyNetwork(nn.Module):
             nn.Flatten(start_dim=1)
         ).to(self.device)
 
-        # build linear layers
+        # actor linear layers
         self.linear1 = nn.Linear((9 ** 2) * self.final_conv_depth, self.hidden_size).to(self.device)
-        self.linear2 = nn.Linear(self.hidden_size, num_actions).to(self.device)        
+        self.linear2 = nn.Linear(self.hidden_size, num_actions).to(self.device)  
+        
+        if critic:
+            # critic linear layers
+            self.linear3 = nn.Linear((9 ** 2) * self.final_conv_depth, self.hidden_size).to(self.device)
+            self.linear4 = nn.Linear(self.hidden_size, 1).to(self.device)              
 
     def forward(self, state):
         features = self.backbone(state)
-        x = F.relu(self.linear1(features))
-        x = F.softmax(self.linear2(x), dim=1)
-        return x 
+        probs = F.relu(self.linear1(features))
+        probs = F.softmax(self.linear2(probs), dim=1)
+        if self.critic:
+            val = F.relu(self.linear3(features))
+            val = self.linear4(val)
+            return probs, val
+        return probs
     
     def get_action(self, state):
-        # state = torch.from_numpy(state).float().unsqueeze(0)
         # transform the state to tensor
         torch_state = preprocess_obs(state, self.device)
         # compute probabilities
-        probs = self.forward(Variable(torch_state))
+        if self.critic:
+            probs, val = self.forward(Variable(torch_state))
+        else:
+            probs = self.forward(Variable(torch_state))
         # choose action
         highest_prob_action = np.random.choice(self.num_actions, p=np.squeeze(probs.detach().cpu().numpy()))
         # compute log prob and entropy
         log_prob = torch.log(probs.squeeze(0)[highest_prob_action])
         entropy = -torch.sum(probs * torch.log(probs + 1e-10))
         return highest_prob_action, log_prob, entropy
+    
+    def get_action_and_value(self, state):
+        # transform the state to tensor
+        torch_state = preprocess_obs(state, self.device)
+        # compute probabilities
+        probs, val = self.forward(Variable(torch_state))
+        # choose action
+        highest_prob_action = np.random.choice(self.num_actions, p=np.squeeze(probs.detach().cpu().numpy()))
+        # compute log prob and entropy
+        log_prob = torch.log(probs.squeeze(0)[highest_prob_action])
+        entropy = -torch.sum(probs * torch.log(probs + 1e-10))
+        return highest_prob_action, log_prob, entropy, val

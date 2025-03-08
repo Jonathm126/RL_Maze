@@ -9,3 +9,6 @@ a2c
 https://medium.com/@dixitaniket76/advantage-actor-critic-a2c-algorithm-explained-and-implemented-in-pytorch-dc3354b60b50
 
 https://minigrid.farama.org/environments/minigrid/MultiRoomEnv/
+
+
+https://github.com/hermesdt/reinforcement-learning/blob/master/a2c/cartpole_a2c_episodic.ipynb
