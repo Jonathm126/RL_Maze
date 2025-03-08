@@ -3,7 +3,7 @@ import torch.distributions
 import torch.nn.functional as F
 
 # my imports
-from src.utils import evaluate_agent_rewards, preprocess_obs, map_action
+from src.utils import evaluate_agent, preprocess_obs, map_action
 from src.train_utils import RolloutBuffer, compute_returns
 
 class Trainer():
@@ -131,7 +131,7 @@ class A2CTrainer(Trainer):
             # preform evaluateion every 'eval_every_episodes'
             if self.episode % val_every_episodes == 0:
                 self.model.eval()
-                _, avg_reward, success_rate, steps_to_done = evaluate_agent_rewards(self.device, self.model, env, num_episodes=50)
+                _, avg_reward, success_rate, steps_to_done = evaluate_agent(self.device, self.model, env, num_episodes=50)
                 self.model.train()
                 
                 # log evaluation results
@@ -237,7 +237,7 @@ class RFTrainer(Trainer):
             # preform evaluateion every 'eval_every_episodes'
             if self.episode % val_every_episodes == 0:
                 self.model.eval()
-                _, avg_reward, success_rate, steps_to_done = evaluate_agent_rewards(self.device, self.model, env, num_episodes=50)
+                _, avg_reward, success_rate, steps_to_done = evaluate_agent(self.device, self.model, env, num_episodes=50)
                 self.model.train()
                 
                 # log evaluation results
