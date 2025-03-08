@@ -22,7 +22,6 @@ def launch_tb(log_dir, port = 6008):
   print(f"TensorBoard logs are saved in: {log_dir}")
   
   # launch tb
-  port = 6010
   tb_process = subprocess.Popen(["tensorboard", f"--logdir={log_dir}", f"--port={port}", "--host=localhost"], 
                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   webbrowser.open(f"http://localhost:{port}");
